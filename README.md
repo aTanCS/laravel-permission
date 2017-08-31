@@ -48,7 +48,14 @@ You can install the package via composer:
 composer require spatie/laravel-permission
 ```
 
-The package will automatically register itself.
+In Laravel 5.5 the service provider will automatically get registered. In older versions of the framework just add the service provider in `config/app.php` file:
+
+```php
+'providers' => [
+    // ...
+    Spatie\Permission\PermissionServiceProvider::class,
+];
+```
 
 You can publish [the migration](https://github.com/spatie/laravel-permission/blob/master/database/migrations/create_permission_tables.php.stub) with:
 
