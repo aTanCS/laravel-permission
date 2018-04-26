@@ -15,6 +15,10 @@ trait HasGroups
     public static function bootHasGroups()
     {
         static::deleting(function ($model) {
+            if (method_exists($model, 'isForceDeleting') && ! $model->isForceDeleting()) {
+                return;
+            }
+
             $model->groups()->detach();
             $model->roles()->detach();
             $model->permissions()->detach();

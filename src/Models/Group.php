@@ -35,6 +35,10 @@ class Group extends Model implements GroupContract
             throw GroupAlreadyExists::create($attributes['name'], $attributes['guard_name']);
         }
 
+        if (app()::VERSION < '5.4') {
+            return parent::create($attributes);
+        }
+
         return static::query()->create($attributes);
     }
 
