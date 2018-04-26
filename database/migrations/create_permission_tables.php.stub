@@ -83,7 +83,7 @@ class CreatePermissionTables extends Migration
         });
 
         Schema::create($tableNames['model_has_groups'], function (Blueprint $table) {
-            $table->integer('group_id')->unsigned();
+            $table->unsignedInteger('group_id');
             $table->morphs('model');
 
             $table->foreign('group_id')
@@ -95,8 +95,8 @@ class CreatePermissionTables extends Migration
         });
 
         Schema::create($tableNames['group_has_roles'], function (Blueprint $table) {
-            $table->integer('group_id')->unsigned();
-            $table->integer('role_id')->unsigned();
+            $table->unsignedInteger('group_id');
+            $table->unsignedInteger('role_id');
 
             $table->foreign('group_id')
                 ->references('id')
@@ -112,8 +112,8 @@ class CreatePermissionTables extends Migration
         });
 
         Schema::create($tableNames['group_has_permissions'], function (Blueprint $table) {
-            $table->integer('group_id')->unsigned();
-            $table->integer('permission_id')->unsigned();
+            $table->unsignedInteger('group_id');
+            $table->unsignedInteger('permission_id');
 
             $table->foreign('group_id')
                 ->references('id')
