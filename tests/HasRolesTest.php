@@ -420,4 +420,27 @@ class HasRolesTest extends TestCase
             $this->testUser->getAllPermissions()->pluck('name')
         );
     }
+
+    /** @test */
+    public function it_can_retrieve_role_names()
+    {
+        $this->testUser->assignRole('testRole', 'testRole2');
+
+        $this->assertEquals(
+            collect(['testRole', 'testRole2']),
+            $this->testUser->getRoleNames()
+        );
+    }
+
+    /** @test */
+    public function it_does_not_detach_roles_when_soft_deleting()
+    {
+        $user = SoftDeletingUser::create(['email' => 'test@example.com']);
+        $user->assignRole('testRole');
+        $user->delete();
+
+        $user = SoftDeletingUser::withTrashed()->find($user->id);
+
+        $this->assertTrue($user->hasRole('testRole'));
+    }
 }

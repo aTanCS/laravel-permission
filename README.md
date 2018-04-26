@@ -21,22 +21,14 @@ $role->givePermissionTo('edit articles');
 
 If you're using multiple guards we've got you covered as well. Every guard will have its own set of permissions and roles that can be assigned to the guard's users. Read about it in the [using multiple guards](#using-multiple-guards) section of the readme.
 
-Because all permissions will be registered on [Laravel's gate](https://laravel.com/docs/5.4/authorization), you can test if a user has a permission with Laravel's default `can` function:
+Because all permissions will be registered on [Laravel's gate](https://laravel.com/docs/5.5/authorization), you can test if a user has a permission with Laravel's default `can` function:
 
 ```php
 $user->can('edit articles');
 ```
 
-Spatie is webdesign agency in Antwerp, Belgium. You'll find an overview of all
+Spatie is a web design agency in Antwerp, Belgium. You'll find an overview of all
 our open source projects [on our website](https://spatie.be/opensource).
-
-## Postcardware
-
-You're free to use this package (it's [MIT-licensed](LICENSE.md)), but if it makes it to your production environment we highly appreciate you sending us a postcard from your hometown, mentioning which of our package(s) you are using.
-
-Our address is: Spatie, Samberstraat 69D, 2060 Antwerp, Belgium.
-
-All received postcards are published [on our website](https://spatie.be/en/opensource/postcards).
 
 ## Installation
 
@@ -169,7 +161,7 @@ return [
 
 ## Usage
 
-First add the `Spatie\Permission\Traits\HasRoles` trait to your `User` model(s):
+First, add the `Spatie\Permission\Traits\HasRoles` trait to your `User` model(s):
 
 ```php
 use Illuminate\Foundation\Auth\User as Authenticatable;
@@ -222,16 +214,24 @@ $permissions = $user->permissions;
 $permissions = $user->getAllPermissions();
 
 // get a collection of all defined roles
-$roles = $user->roles->pluck('name'); // Returns a collection
+$roles = $user->getRoleNames(); // Returns a collection
 ```
 
-The `HasRoles` trait also adds a scope to your models to scope the query to certain roles:
+The `HasRoles` trait also adds a `role` scope to your models to scope the query to certain roles or permissions:
 
 ```php
 $users = User::role('writer')->get(); // Returns only users with the role 'writer'
 ```
 
-The scope can accept a string, a `\Spatie\Permission\Models\Role` object or an `\Illuminate\Support\Collection` object.
+The `role` scope can accept a string, a `\Spatie\Permission\Models\Role` object or an `\Illuminate\Support\Collection` object.
+
+The same trait also adds a scope to only get users that have a certain permission.
+
+```php
+$users = User::permission('edit articles')->get(); // Returns only users with the permission 'edit articles' (inherited or directly)
+```
+
+The scope can accept a string, a `\Spatie\Permission\Models\Permission` object or an `\Illuminate\Support\Collection` object.
 
 ### Using "direct" permissions (see below to use both roles and permissions)
 
@@ -360,7 +360,7 @@ $user->assignRole('writer');
 $user->givePermissionTo('delete articles');
 ```
 
-In the above example a role is given permission to edit articles and this role is assigned to a user. 
+In the above example, a role is given permission to edit articles and this role is assigned to a user. 
 Now the user can edit articles and additionally delete articles. The permission of 'delete articles' is the user's direct permission because it is assigned directly to them.
 When we call `$user->hasDirectPermission('delete articles')` it returns `true`, 
 but `false` for `$user->hasDirectPermission('edit articles')`.
@@ -382,8 +382,8 @@ $user->getAllPermissions();
 
 All these responses are collections of `Spatie\Permission\Models\Permission` objects.
 
-If we follow the previous example, the first response will be a collection with the 'delete article' permission, the
-second will be a collection with the 'edit article' permission and the third will contain both.
+If we follow the previous example, the first response will be a collection with the `delete article` permission and 
+the second will be a collection with the `edit article` permission and the third will contain both.
 
 ### Using Blade directives
 This package also adds Blade directives to verify whether the currently logged in user has all or any of a given list of roles. 
@@ -410,7 +410,7 @@ is the same as
 
 Test for any role in a list:
 ```php
-@hasanyrole(Role::all())
+@hasanyrole($collectionOfRoles)
     I have one or more of these roles!
 @else
     I have none of these roles...
@@ -425,7 +425,7 @@ Test for any role in a list:
 Test for all roles:
 
 ```php
-@hasallroles(Role::all())
+@hasallroles($collectionOfRoles)
     I have all of these roles!
 @else
     I do not have all of these roles...
@@ -457,7 +457,7 @@ or
 
 When using the default Laravel auth configuration all of the above methods will work out of the box, no extra configuration required.
 
-However when using multiple guards they will act like namespaces for your permissions and roles. Meaning every guard has its own set of permissions and roles that can be assigned to their user model.
+However, when using multiple guards they will act like namespaces for your permissions and roles. Meaning every guard has its own set of permissions and roles that can be assigned to their user model.
 
 ### Using permissions and roles with multiple guards
 
@@ -523,18 +523,31 @@ Route::group(['middleware' => ['role:super-admin','permission:publish articles']
     //
 });
 ```
+
+Alternatively, you can separate multiple roles or permission with a `|` (pipe) character:
+
+```php
+Route::group(['middleware' => ['role:super-admin|writer']], function () {
+    //
+});
+
+Route::group(['middleware' => ['permission:publish articles|edit articles']], function () {
+    //
+});
+```
+
 You can protect your controllers similarly, by setting desired middleware in the constructor:
 
 ```php
-public function __construct
+public function __construct()
 {
-    $this->middleware(['role:super-admin','permission:publish articles']);
+    $this->middleware(['role:super-admin','permission:publish articles|edit articles']);
 }
 ```
 
 ## Using artisan commands
 
-You can create a role or permission from console with artisan commands.
+You can create a role or permission from a console with artisan commands.
 
 ```bash
 php artisan permission:create-role writer
@@ -554,13 +567,28 @@ php artisan permission:create-role writer web
 php artisan permission:create-permission 'edit articles' web
 ```
 
+## Unit Testing
+
+In your application's tests, if you are not seeding roles and permissions as part of your test `setUp()` then you may run into a chicken/egg situation where roles and permissions aren't registered with the gate (because your tests create them after that gate registration is done). Working around this is simple: In your tests simply add a `setUp()` instruction to re-register the permissions, like this:
+
+```php
+    public function setUp()
+    {
+        // first include all the normal setUp operations
+        parent::setUp();
+
+        // now re-register all the roles and permissions
+        $this->app->make(\Spatie\Permission\PermissionRegistrar::class)->registerPermissions();
+    }
+```
+
 ## Database Seeding
 
 Two notes about Database Seeding:
 
 1. It is best to flush the `spatie.permission.cache` before seeding, to avoid cache conflict errors. This can be done from an Artisan command (see Troubleshooting: Cache section, later) or directly in a seeder class (see example below).
 
-2. Here's a sample seeder, which clears the cache, creates permissions, and then assigns permissions to roles:
+2. Here's a sample seeder, which clears the cache, creates permissions and then assigns permissions to roles:
 
 	```php
 	use Illuminate\Database\Seeder;
@@ -608,48 +636,67 @@ php artisan vendor:publish --provider="Spatie\Permission\PermissionServiceProvid
   
   And update the `models.role` and `models.permission` values
 
-## Troubleshooting
 
-### Cache
+## Cache
 
-If you manipulate permission/role data directly in the database instead of calling the supplied methods, then you will not see the changes reflected in the application, because role and permission data is cached to speed up performance.
+Role and Permission data are cached to speed up performance.
 
+When you use the supplied methods for manipulating roles and permissions, the cache is automatically reset for you:
+
+```php
+$user->assignRole('writer');
+$user->removeRole('writer');
+$user->syncRoles(params);
+$role->givePermissionTo('edit articles');
+$role->revokePermissionTo('edit articles');
+$role->syncPermissions(params);
+```
+
+HOWEVER, if you manipulate permission/role data directly in the database instead of calling the supplied methods, then you will not see the changes reflected in the application unless you manually reset the cache.
+
+### Manual cache reset
 To manually reset the cache for this package, run:
 ```bash
 php artisan cache:forget spatie.permission.cache
 ```
 
-When you use the supplied methods, such as the following, the cache is automatically reset for you:
+### Cache Identifier
 
-```php
-// see earlier in the README for how these methods work:
-$user->assignRole('writer');
-$user->removeRole('writer');
-$role->givePermissionTo('edit articles');
-$role->revokePermissionTo('edit articles');
-```
+TIP: If you are leveraging a caching service such as `redis` or `memcached` and there are other sites 
+running on your server, you could run into cache clashes. It is prudent to set your own cache `prefix` 
+in `/config/cache.php` to something unique for each application. This will prevent other applications 
+from accidentally using/changing your cached data.
+
 
 ## Need a UI?
 
 The package doesn't come with any screens out of the box, you should build that yourself. To get started check out [this extensive tutorial](https://scotch.io/tutorials/user-authorization-in-laravel-54-with-spatie-laravel-permission) by [Caleb Oki](http://www.caleboki.com/).
 
-## Changelog
-
-Please see [CHANGELOG](CHANGELOG.md) for more information what has changed recently.
-
-## Testing
+### Testing
 
 ``` bash
 composer test
 ```
 
+### Changelog
+
+Please see [CHANGELOG](CHANGELOG.md) for more information what has changed recently.
+
 ## Contributing
 
 Please see [CONTRIBUTING](CONTRIBUTING.md) for details.
 
-## Security
+### Security
 
-If you discover any security related issues, please email [freek@spatie.be](mailto:freek@spatie.be) instead of using the issue tracker.
+If you discover any security-related issues, please email [freek@spatie.be](mailto:freek@spatie.be) instead of using the issue tracker.
+
+## Postcardware
+
+You're free to use this package, but if it makes it to your production environment we highly appreciate you sending us a postcard from your hometown, mentioning which of our package(s) you are using.
+
+Our address is: Spatie, Samberstraat 69D, 2060 Antwerp, Belgium.
+
+We publish all received postcards [on our company website](https://spatie.be/en/opensource/postcards).
 
 ## Credits
 
@@ -668,11 +715,14 @@ Special thanks to [Alex Vanderbist](https://github.com/AlexVanderbist) who great
 
 ## Alternatives
 
-[Povilas Korop](https://twitter.com/@povilaskorop) did an excellent job listing the alternatives [in an article on Laravel News](https://laravel-news.com/two-best-roles-permissions-packages). In that same article he compares laravel-permission to [Joseph Silber](https://github.com/JosephSilber)'s [Bouncer]((https://github.com/JosephSilber/bouncer)), which in our book is also an excellent package.
+[Povilas Korop](https://twitter.com/@povilaskorop) did an excellent job listing the alternatives [in an article on Laravel News](https://laravel-news.com/two-best-roles-permissions-packages). In that same article, he compares laravel-permission to [Joseph Silber](https://github.com/JosephSilber)'s [Bouncer]((https://github.com/JosephSilber/bouncer)), which in our book is also an excellent package.
 
-## About Spatie
+## Support us
 
-Spatie is webdesign agency in Antwerp, Belgium. You'll find an overview of all our open source projects [on our website](https://spatie.be/opensource).
+Spatie is a web design agency based in Antwerp, Belgium. You'll find an overview of all our open source projects [on our website](https://spatie.be/opensource).
+
+Does your business depend on our contributions? Reach out and support us on [Patreon](https://www.patreon.com/spatie). 
+All pledges will be dedicated to allocating workforce on maintenance and new awesome stuff.
 
 ## License
 
