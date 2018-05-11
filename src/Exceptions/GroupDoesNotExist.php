@@ -10,4 +10,9 @@ class GroupDoesNotExist extends InvalidArgumentException
     {
         return new static("There is no group named `{$roleName}`.");
     }
+
+    public static function withId(int $roleId)
+    {
+        return new static("There is no group with id `{$roleId}`.");
+    }
 }

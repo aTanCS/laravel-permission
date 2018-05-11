@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Spatie\Permission\Exceptions\GroupAlreadyExists;
 use Spatie\Permission\Exceptions\GuardDoesNotMatch;
 use Spatie\Permission\Exceptions\GroupDoesNotExist;
+use Spatie\Permission\Guard;
 use Spatie\Permission\Traits\HasRoles;
 use Spatie\Permission\Traits\RefreshesPermissionCache;
 use Spatie\Permission\Contracts\Group as GroupContract;
@@ -99,6 +100,40 @@ class Group extends Model implements GroupContract
         }
 
         return $role;
+    }
+
+    public static function findById(int $id, $guardName = null): GroupContract
+    {
+        $guardName = $guardName ?? Guard::getDefaultName(static::class);
+
+        $group = static::where('id', $id)->where('guard_name', $guardName)->first();
+
+        if (! $group) {
+            throw GroupDoesNotExist::withId($id);
+        }
+
+        return $group;
+    }
+
+    /**
+     * Find or create group by its name (and optionally guardName).
+     *
+     * @param string $name
+     * @param string|null $guardName
+     *
+     * @return \Spatie\Permission\Contracts\Group
+     */
+    public static function findOrCreate(string $name, $guardName = null): GroupContract
+    {
+        $guardName = $guardName ?? Guard::getDefaultName(static::class);
+
+        $group = static::where('name', $name)->where('guard_name', $guardName)->first();
+
+        if (! $group) {
+            return static::create(['name' => $name, 'guard_name' => $guardName]);
+        }
+
+        return $group;
     }
 
     /**
